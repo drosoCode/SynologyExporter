@@ -7,7 +7,6 @@ import json
 import syslog
 import time
 from influxdb import InfluxDBClient
-from gelfclient import UdpClient
 
 
 class exporter:
@@ -16,7 +15,7 @@ class exporter:
             config = yaml.full_load(f)
             print("Configuration loaded")
 
-        self.__gelf = False
+        self.__graylog = False
         self.__influx = False
         self.__interval = config["synology"]["update"]
         self.__addr = config["synology"]["address"]
@@ -26,11 +25,9 @@ class exporter:
         self.__lastLogLine = ""
 
         if config["graylog"]["enabled"]:
-            self.__gelf = UdpClient(
-                config["graylog"]["address"],
-                port=config["graylog"]["port"],
-                source=config["graylog"]["source"],
-            )
+            self.__graylog = True
+            self.__graylogAddr = config["graylog"]["address"]
+            self._graylogSrc = config["graylog"]["source"]
             print("graylog initialized")
 
         if config["influxdb"]["enabled"]:
@@ -62,7 +59,7 @@ class exporter:
     def start(self):
         while True:
             try:
-                if self.__gelf:
+                if self.__graylog:
                     self.__updateGraylog()
                 if self.__influx:
                     self.__updateInflux()
@@ -77,13 +74,19 @@ class exporter:
 
         for line in data:
             if json.dumps(line) != self.__lastLogLine:
-                print(line)
-                self.__gelf.log(
-                    line["descr"],
-                    level=self.__getSyslogLevel(line["level"]),
-                    _user=line["who"],
-                    timestamp=datetime.timestamp(
-                        datetime.strptime(line["time"], "%Y/%m/%d %H:%M:%S")
+                requests.post(
+                    self.__graylogAddr + "/gelf",
+                    data=json.dumps(
+                        {
+                            "version": "1.1",
+                            "host": self._graylogSrc,
+                            "short_message": line["descr"],
+                            "level": self.__getSyslogLevel(line["level"]),
+                            "_user": line["who"]
+                            # "timestamp": datetime.timestamp(
+                            #    datetime.strptime(line["time"], "%Y/%m/%d %H:%M:%S")
+                            # ),
+                        }
                     ),
                 )
             else:
