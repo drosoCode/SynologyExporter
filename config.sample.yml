@@ -1,0 +1,16 @@
+synology:
+  username: USER
+  password: PASS
+  address: "http://ip:5000"
+  update: 30
+graylog:
+  address: "https://addr:12202"
+  source: Syno
+  enabled: true
+influxdb:
+  address: "ip"
+  port: 3386
+  user: USER
+  password: PASS
+  database: synology
+  enabled: true
